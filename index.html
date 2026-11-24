@@ -13,6 +13,7 @@
     --btn-hover: #e6e8ec;
     --neg: #378ADD;
     --toggle: #185FA5;
+    --pen: #0F6E56;
     --teal-fill: #E1F5EE; --teal-stroke: #0F6E56; --teal-text: #085041;
     --blue-fill: #E6F1FB; --blue-stroke: #185FA5; --blue-text: #0C447C;
   }
@@ -23,6 +24,7 @@
       --border: #3a3f48;
       --btn-bg: #23262d;
       --btn-hover: #2e323b;
+      --pen: #5DCAA5;
       --teal-fill: #04342C; --teal-stroke: #5DCAA5; --teal-text: #9FE1CB;
       --blue-fill: #042C53; --blue-stroke: #85B7EB; --blue-text: #B5D4F4;
     }
@@ -52,13 +54,20 @@
   .box.blue text { fill: var(--blue-text); }
   #val { font-size: 28px; font-weight: 500; }
 
-  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; margin-top: 4px; }
+  .row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; }
+  .row.main { gap: 8px; margin-top: 4px; }
+  .row.draw { gap: 10px; margin-top: 10px; }
+  .tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .tools[hidden] { display: none; }
+
   .nb {
     padding: 6px 14px; font: inherit; font-size: 14px;
     border: 1px solid var(--border); border-radius: 8px;
     background: var(--btn-bg); color: var(--text); cursor: pointer;
   }
-  .nb:hover { background: var(--btn-hover); }
+  .nb:hover:not(:disabled) { background: var(--btn-hover); }
+  .nb:disabled, .tg:disabled { opacity: .4; cursor: not-allowed; }
+
   .tg {
     display: inline-flex; align-items: center; gap: 3px;
     padding: 4px 9px; font: inherit; font-size: 13px;
@@ -68,13 +77,26 @@
   .tg.off { background: transparent; color: var(--neg); border-color: var(--neg); }
   .tg .slash { display: none; }
   .tg.off .slash { display: inline; }
+
+  .pen {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 6px 14px; font: inherit; font-size: 14px;
+    border: 1px solid var(--pen); border-radius: 8px;
+    background: transparent; color: var(--pen); cursor: pointer;
+  }
+  .pen.on { background: #0F6E56; border-color: #0F6E56; color: #fff; }
+
+  .sw { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); padding: 0; cursor: pointer; }
+  .sw.sel { outline: 2px solid var(--text); outline-offset: 2px; }
+  .sw.def { background: var(--text); }
+
   button:focus-visible { outline: 2px solid var(--neg); outline-offset: 2px; }
 </style>
 </head>
 <body>
 <main>
   <h1>Tallinje</h1>
-  <p class="hint">Dra tallinjen i sidled, använd piltangenterna eller tryck på knapparna.</p>
+  <p class="hint">Dra tallinjen i sidled, använd piltangenterna eller tryck på knapparna. Med Rita fryser du tallinjen och kan rita på den.</p>
 
   <svg id="nl" viewBox="0 0 680 190" tabindex="0" role="img" aria-label="Tallinje, dra i sidled eller använd piltangenterna">
     <defs>
@@ -98,9 +120,10 @@
       <text id="val" x="340" y="35" text-anchor="middle" dominant-baseline="central">0</text>
     </g>
     <line class="arr" x1="340" y1="64" x2="340" y2="102" stroke-width="2" marker-end="url(#arrow)"/>
+    <g id="drawing" style="transform:translateX(340px)"></g>
   </svg>
 
-  <div class="controls">
+  <div class="row main">
     <button id="tg" class="tg" type="button" aria-pressed="true" aria-label="Visa eller dölj den negativa delen av tallinjen" title="Tänd eller släck den negativa delen">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7"/>
@@ -119,28 +142,45 @@
     <button class="nb" type="button" data-d="25">+25</button>
     <button class="nb" type="button" data-d="100">+100</button>
   </div>
+
+  <div class="row draw">
+    <button id="pen" class="pen" type="button" aria-pressed="false" title="Frys tallinjen och rita">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/>
+        <path d="M13.5 6.5l4 4"/>
+      </svg>
+      <span id="penl">Rita</span>
+    </button>
+    <div id="tools" class="tools" hidden>
+      <button class="sw def sel" type="button" data-c="var(--text)" aria-label="Standardfärg"></button>
+      <button class="sw" type="button" data-c="#E24B4A" style="background:#E24B4A" aria-label="Röd"></button>
+      <button class="sw" type="button" data-c="#1D9E75" style="background:#1D9E75" aria-label="Grön"></button>
+      <button class="sw" type="button" data-c="#7F77DD" style="background:#7F77DD" aria-label="Lila"></button>
+      <button id="undo" class="nb" type="button">Ångra</button>
+      <button id="clr" class="nb" type="button">Rensa</button>
+    </div>
+  </div>
 </main>
 
 <script>
 (function () {
-  var U = 8.5, MIN = -1000, MAX = 1000;
-  var svg = document.getElementById('nl'),
-      line = document.getElementById('line'),
-      val = document.getElementById('val'),
-      box = document.getElementById('box'),
-      axN = document.getElementById('axN'),
-      axP = document.getElementById('axP'),
-      labels = document.getElementById('labels'),
-      tg = document.getElementById('tg');
+  var U = 8.5, MIN = -1000, MAX = 1000, NS = 'http://www.w3.org/2000/svg';
+  function $(id) { return document.getElementById(id); }
+  var svg = $('nl'), line = $('line'), drawing = $('drawing'), val = $('val'), box = $('box'),
+      axN = $('axN'), axP = $('axP'), labels = $('labels'),
+      tg = $('tg'), pen = $('pen'), penl = $('penl'), tools = $('tools');
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  var v = 0, tgt = 0, raf = 0, cen = 1e9, drag = false, sx = 0, sv = 0, negOn = true;
+  var v = 0, tgt = 0, raf = 0, cen = 1e9;
+  var drag = false, sx = 0, sv = 0;
+  var negOn = true, frozen = false, cur = null, curD = '', color = 'var(--text)';
+  var strokes = [];
 
   function clamp(n) { return Math.max(negOn ? MIN : 0, Math.min(MAX, n)); }
   function fx(n) { return +(n * U).toFixed(2); }
   function txt(r) { return r < 0 ? '\u2212' + (-r) : String(r); }
 
-  // Ritar bara cirka 160 heltal runt det aktuella talet, så att sidan blir snabb.
+  // Ritar bara cirka 140 heltal runt det aktuella talet, så att sidan blir snabb.
   function build() {
     var c = Math.round(v);
     if (Math.abs(c - cen) < 15) return;
@@ -160,7 +200,7 @@
         d[k + '1'] += 'M' + x + ' 120V132';
       }
     }
-    for (var key in d) document.getElementById(key).setAttribute('d', d[key]);
+    for (var key in d) $(key).setAttribute('d', d[key]);
     axN.setAttribute('x1', lo < 0 ? fx(lo) : 0);
     axN.setAttribute('x2', lo < 0 ? fx(Math.min(hi, 0)) : 0);
     axP.setAttribute('x1', hi > 0 ? fx(Math.max(lo, 0)) : 0);
@@ -171,7 +211,9 @@
 
   function render() {
     build();
-    line.style.transform = 'translateX(' + (340 - U * v) + 'px)';
+    var t = 'translateX(' + (340 - U * v) + 'px)';
+    line.style.transform = t;
+    drawing.style.transform = t;
     var r = Math.round(v);
     val.textContent = txt(r);
     box.setAttribute('class', 'box ' + (r < 0 ? 'blue' : 'teal'));
@@ -194,7 +236,43 @@
     raf = requestAnimationFrame(f);
   }
 
-  function step(dd) { tgt = clamp(Math.round(tgt) + dd); animateTo(tgt); }
+  function step(dd) {
+    if (frozen) return;
+    tgt = clamp(Math.round(tgt) + dd);
+    animateTo(tgt);
+  }
+
+  // Fryser tallinjen och slår på ritläget.
+  function setFrozen(f) {
+    frozen = f;
+    cancelAnimationFrame(raf);
+    if (f) { v = Math.round(v); tgt = v; cen = 1e9; render(); }
+    svg.style.touchAction = f ? 'none' : 'pan-y';
+    svg.style.cursor = f ? 'crosshair' : 'grab';
+    pen.classList.toggle('on', f);
+    pen.setAttribute('aria-pressed', f ? 'true' : 'false');
+    penl.textContent = f ? 'Klar' : 'Rita';
+    tools.hidden = !f;
+    Array.prototype.forEach.call(document.querySelectorAll('.nb[data-d]'), function (b) { b.disabled = f; });
+    tg.disabled = f;
+  }
+
+  pen.addEventListener('click', function () { setFrozen(!frozen); });
+
+  var swatches = document.querySelectorAll('.sw');
+  Array.prototype.forEach.call(swatches, function (b) {
+    b.addEventListener('click', function () {
+      color = b.getAttribute('data-c');
+      Array.prototype.forEach.call(swatches, function (x) { x.classList.toggle('sel', x === b); });
+    });
+  });
+  $('undo').addEventListener('click', function () {
+    var s = strokes.pop();
+    if (s) s.parentNode.removeChild(s);
+  });
+  $('clr').addEventListener('click', function () {
+    while (strokes.length) { var s = strokes.pop(); s.parentNode.removeChild(s); }
+  });
 
   tg.addEventListener('click', function () {
     negOn = !negOn;
@@ -204,19 +282,49 @@
     animateTo(tgt);
   });
 
+  // Punkter sparas i tallinjens egna koordinater, så ritningen följer med när linjen flyttas.
+  function inkPoint(e) {
+    var r = svg.getBoundingClientRect(), k = 680 / r.width;
+    return {
+      x: +((e.clientX - r.left) * k - (340 - U * v)).toFixed(1),
+      y: +((e.clientY - r.top) * k).toFixed(1)
+    };
+  }
+
   svg.addEventListener('pointerdown', function (e) {
+    svg.setPointerCapture(e.pointerId);
+    if (frozen) {
+      var p = inkPoint(e);
+      cur = document.createElementNS(NS, 'path');
+      curD = 'M' + p.x + ' ' + p.y + ' l0.01 0';
+      cur.setAttribute('d', curD);
+      cur.setAttribute('fill', 'none');
+      cur.setAttribute('stroke-width', '3');
+      cur.setAttribute('stroke-linecap', 'round');
+      cur.setAttribute('stroke-linejoin', 'round');
+      cur.style.stroke = color;
+      drawing.appendChild(cur);
+      strokes.push(cur);
+      return;
+    }
     cancelAnimationFrame(raf);
     drag = true; sx = e.clientX; sv = v;
-    svg.setPointerCapture(e.pointerId);
     svg.style.cursor = 'grabbing';
   });
   svg.addEventListener('pointermove', function (e) {
+    if (cur) {
+      var p = inkPoint(e);
+      curD += ' L' + p.x + ' ' + p.y;
+      cur.setAttribute('d', curD);
+      return;
+    }
     if (!drag) return;
     var k = 680 / svg.getBoundingClientRect().width;
     v = clamp(sv - (e.clientX - sx) * k / U);
     render();
   });
   function end() {
+    if (cur) { cur = null; return; }
     if (!drag) return;
     drag = false;
     svg.style.cursor = 'grab';
@@ -229,7 +337,7 @@
     if (e.key === 'ArrowRight') { step(1); e.preventDefault(); }
     else if (e.key === 'ArrowLeft') { step(-1); e.preventDefault(); }
   });
-  Array.prototype.forEach.call(document.querySelectorAll('.nb'), function (b) {
+  Array.prototype.forEach.call(document.querySelectorAll('.nb[data-d]'), function (b) {
     b.addEventListener('click', function () { step(parseInt(b.getAttribute('data-d'), 10)); });
   });
 
